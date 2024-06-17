@@ -3,7 +3,7 @@ title: A membership proof extensions for the Messaging Layer Security (MLS) Prot
 abbrev: MLS membership proof
 category: info
 ipr: trust200902
-docname: draft-mahy-mls-member-proof-latest
+docname: draft-mahy-member-proof-latest
 submissiontype: IETF  # also: "independent", "editorial", "IAB", or "IRTF"
 consensus: true
 v: 3
