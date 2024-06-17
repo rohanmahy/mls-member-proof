@@ -11,6 +11,7 @@ v: 3
 # workgroup: MLS Working Group
 keyword:
  - membership proof
+ - safe extension
 venue:
 #  group: MLS
 #  type: Working Group
@@ -32,19 +33,26 @@ informative:
 
 --- abstract
 
-TODO Abstract
-
+This document describes an MLS safe extension that members of a group
+can use to assert membership to non-members.
 
 --- middle
 
 # Introduction
 
-TODO Introduction
-
+The Messaging Layer Security (MLS) Protocol {{!RFC9420}} is a group key
+management protocol which also provides group agreement on the membership
+and group context during each epoch. This document defines a Safe Extension
+(Section 2 of {{!I-D.ietf-mls-extensions}}) that can be used for members to
+assert membership in the group to non-members (for example, an MLS
+Distribution Service), such that a dishonest assertion will be immediately
+apparent to other members.
 
 # Conventions and Definitions
 
 {::boilerplate bcp14-tagged}
+
+# Mechanism
 
 
 # Security Considerations
