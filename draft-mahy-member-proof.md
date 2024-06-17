@@ -7,17 +7,17 @@ docname: draft-mahy-member-proof-latest
 submissiontype: IETF  # also: "independent", "editorial", "IAB", or "IRTF"
 consensus: true
 v: 3
-area: sec
-workgroup: MLS Working Group
+# area: sec
+# workgroup: MLS Working Group
 keyword:
  - membership proof
 venue:
-  group: MLS
-  type: Working Group
-  mail: mls@ietf.org
-  arch: https://mailarchive.ietf.org/arch/browse/mls/
-  github: rohanmahy/mls-member-proof/
-  latest: https://github.com/rohanmahy/mls-member-proof/latest
+#  group: MLS
+#  type: Working Group
+#  mail: mls@ietf.org
+#  arch: https://mailarchive.ietf.org/arch/browse/mls/
+  github: "rohanmahy/mls-member-proof"
+  latest: "https://rohanmahy.github.io/mls-member-proof/draft-mahy-member-proof.html"
 
 author:
  -  ins: R. Mahy
