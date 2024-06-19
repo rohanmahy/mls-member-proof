@@ -1,0 +1,295 @@
+
+
+
+
+Network Working Group                                            R. Mahy
+Internet-Draft                            Rohan Mahy Consulting Services
+Intended status: Informational                              19 June 2024
+Expires: 21 December 2024
+
+
+  A membership proof extensions for the Messaging Layer Security (MLS)
+                                Protocol
+                   draft-mahy-mls-member-proof-latest
+
+Abstract
+
+   This document describes an MLS safe extension that members of a group
+   can use to assert membership to non-members.
+
+About This Document
+
+   This note is to be removed before publishing as an RFC.
+
+   The latest revision of this draft can be found at
+   https://rohanmahy.github.io/mls-member-proof/draft-mahy-member-
+   proof.html.  Status information for this document may be found at
+   https://datatracker.ietf.org/doc/draft-mahy-mls-member-proof/.
+
+   Source for this draft and an issue tracker can be found at
+   https://github.com/rohanmahy/mls-member-proof.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 21 December 2024.
+
+Copyright Notice
+
+   Copyright (c) 2024 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Mechanism
+     3.1.  Sending a PrivateMessage with a membership proof
+     3.2.  Verifying a PrivateMessage with a membership proof
+   4.  Handshake Sharing Usage
+   5.  New Requirements on Safe Extensions framework
+   6.  Security Considerations
+   7.  IANA Considerations
+     7.1.  MLS Extension Type handshake_framed_data_hash
+     7.2.  MLS Extension Type next_epoch_member_proof_key
+   8.  Normative References
+   Acknowledgments
+   Author's Address
+
+1.  Introduction
+
+   The Messaging Layer Security (MLS) Protocol [RFC9420] is a group key
+   management protocol which also provides group agreement on the
+   membership and group context during each epoch.  This document
+   defines a Safe Extension (Section 2 of [I-D.ietf-mls-extensions])
+   that can be used for members to assert membership in the group to
+   non-members (for example, an MLS Distribution Service), such that a
+   dishonest assertion will be immediately apparent to other members.
+
+   This extension includes a new epoch-derived secret called the
+   member_proof; a description of how to export the member_proof public
+   key; a description of how to include in the Additional Authentication
+   Data (AAD) of MLS encrypted messages, and a signature of a usage-
+   specfic struct of an encrypted message signed with the member_proof
+   private key.
+
+   Depending on the specific usage of this extension, signing specific
+   MLS messages could be either required for every member of a group, or
+   used optionally by any member as it sees fit.
+
+   The document also defines a usage for sharing signatures of handshake
+   messages so they can be safely shared out-of-band with another party
+   (for example an MLS Distribution Service).
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   This document refers to TLS Presentation Language [RFC8446] structs
+   defined in the MLS protocol [RFC9420].
+
+3.  Mechanism
+
+3.1.  Sending a PrivateMessage with a membership proof
+
+   This document defines a new Safe Extension for sending a membership
+   proof in the Additional Authenticated Data (AAD) of an MLS
+   PrivateMessage.  A sender follows the following steps:
+
+   1.  Derive the member_proof key pair using the ExtensionType
+       member_proof.  The private key is known as MemberProofPrivKey and
+       the public key is known as MemberProofPubKey.
+
+   2.  Generate a new unique nonce of KDF.Nh octets using the Key
+       Derivation Function of the current cipher suite.
+
+   3.  Calculate the hash of the concatenation of the nonce and whatever
+       data (the UsageData) is required by the usage of the application.
+       The hash function is the hash function from the current cipher
+       suite.  The hash is known as the (ContentHash)
+
+   ContentHash = hash(concatenation(nonce + FramedContent))
+
+   1.  Sign ContentHash with the ExtensionType for the usage, using the
+       member_proof private key (MemberProofPrivKey):
+
+   safe_signature = SafeSignaSafeSignWithLabel(
+      ExtensionType, MemberProofPrivKey, Label, ContentHash)
+
+   where ExtensionType is the IANA-assigned value for the usage,
+   MemberProofPrivKey is the private key derived from member_proof for
+   the current epoch, and ContentHash is calculated in the previous
+   step.  (Label is defined as "MLS 1.0 ExtensionData" in
+   [I-D.ietf-mls-extensions].)
+
+   1.  The MemberProofAAD struct is conveyed in the aad_item_data of the
+       aad_items of the authenticated_data of the PrivateMessage, using
+       the usage's ExtensionType.
+
+   tls struct { opaque nonce<V>; opaque safe_signature<V>; optional
+   opaque MemberProofPubKey; } MemberProofAAD;
+
+   The MemberProofPubKey public key SHOULD be included unless the sender
+   knows the intended target will receive it another way.
+
+3.2.  Verifying a PrivateMessage with a membership proof
+
+   1.  Verify that the AAD in messages conforms to the policy of the
+       group (that required items are present, and forbidden )
+
+   2.  If present, find the MemberProofAAD in the aad_items of the
+       authenticated_data of a PrivateMessage; extract the nonce,
+       safe_signature and MemberProofPubKey.
+
+   3.  Members verify that the MemberProofPubKey matches the derived key
+       for member_proof for the current epoch.
+
+   4.  Members calculate the ContentHash of the nonce and the relevant
+       UsageData.
+
+   5.  Members verify that the safe_signature is correct.
+
+   6.  Perform any additional usage-related verifications.
+
+4.  Handshake Sharing Usage
+
+   This document also defines a usage of this member proofs to share an
+   unencrypted copy of the FramedContent of commits and proposals
+   (collectively handshake messages) that are inside an MLS
+   PrivateMessage, typically to an MLS Distribution Service (DS).  It
+   creates the handshake_framed_data_hash extension_type.  For this
+   usage the UsageData consists of the FramedContent of the handshake
+   message.
+
+   The client sending the handshake message makes an assurance that the
+   handshake message is the same as the encrypted one.
+
+   The sharing client can share a copy of the FramedContent of the
+   handshakes with the DS.  The DS calculates the signature on
+   FramedContent it receives with the signature in the MemberProofAAD of
+   the PrivateMessage.  Other members compare the signature in the
+   MemberProofAAD with their own in-group copy of the FramedContent.  If
+   the signature does not match, the other members know that the the
+   sharing client is either malicious or has a bug.  In either case, the
+   other clients know that they can no longer trust the sharing client
+   and can take whatever actions are necessary to exclude it (ex:
+   informing the DS, forcibly removing the client from the group if
+   possible, or creating new groups without the client).
+
+   When a client sends commit message using this usage, it can also send
+   a SafeAADItem with the extension_type of next_epoch_member_proof_key.
+   The aad_item_data is the public key of the member_proof for the next
+   epoch, if the commit is accepted by the group.
+
+   Other members which receive a next_epoch_member_proof_key extension
+   in the aad_items of the authenticated_data need to verify that it was
+   sent only in a commit, and that the public key would be correct if
+   the commit is accepted.  (If the commit is already invalid for other
+   reasons, the client does not need to continue this verification).
+
+5.  New Requirements on Safe Extensions framework
+
+   This document depends on two new features of the Safe Extensions
+   framework, currently documented in PRs #28 (exporting the
+   member_proof public key) and #29 (framing/muxing of AAD) on
+   [I-D.ietf-mls-extensions].
+
+6.  Security Considerations
+
+   TODO
+
+7.  IANA Considerations
+
+   This document requests the addition of various new values under the
+   heading of "Messaging Layer Security".  Each registration is
+   organized under the relevant registry Type.
+
+   RFC EDITOR: Please replace XXXX throughout with the RFC number
+   assigned to this document
+
+7.1.  MLS Extension Type handshake_framed_data_hash
+
+   *  Value: To be assigned by IANA
+
+   *  Name: handshake_framed_data_hash
+
+   *  Message(s): AD: This extension may appear in SafeAADInfo objects.
+
+   *  Recommended: Y
+
+   *  Reference: RFC XXXX
+
+7.2.  MLS Extension Type next_epoch_member_proof_key
+
+   *  Value: To be assigned by IANA
+
+   *  Name: next_epoch_member_proof_key
+
+   *  Message(s): GC, AD: This extension may appear in GroupContext
+      objects and/or SafeAADInfo objects.
+
+   *  Recommended: Y
+
+   *  Reference: RFC XXXX
+
+8.  Normative References
+
+   [I-D.ietf-mls-extensions]
+              Robert, R., "The Messaging Layer Security (MLS)
+              Extensions", Work in Progress, Internet-Draft, draft-ietf-
+              mls-extensions-04, 24 April 2024,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-mls-
+              extensions-04>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC8446]  Rescorla, E., "The Transport Layer Security (TLS) Protocol
+              Version 1.3", RFC 8446, DOI 10.17487/RFC8446, August 2018,
+              <https://www.rfc-editor.org/rfc/rfc8446>.
+
+   [RFC9420]  Barnes, R., Beurdouche, B., Robert, R., Millican, J.,
+              Omara, E., and K. Cohn-Gordon, "The Messaging Layer
+              Security (MLS) Protocol", RFC 9420, DOI 10.17487/RFC9420,
+              July 2023, <https://www.rfc-editor.org/rfc/rfc9420>.
+
+Acknowledgments
+
+   TODO acknowledge.
+
+Author's Address
+
+   Rohan Mahy
+   Rohan Mahy Consulting Services
+   Email: rohan.ietf@gmail.com
